@@ -22,7 +22,7 @@ impl FilterPacker {
         let bytes_per_row = (width as usize * bpp) as usize;
         
         for y in 0..height {
-            let row_start = (y * bytes_per_row) as usize;
+            let row_start = (y * bytes_per_row as u32) as usize;
             let row_end = row_start + bytes_per_row;
             
             if row_end > data.len() {
@@ -152,10 +152,10 @@ impl FilterUnpacker {
                 row_index: y as usize,
                 column_index: 0,
                 previous_row: if y > 0 {
-                    let prev_start = (y - 1) * bytes_per_row;
-                    let prev_end = prev_start + bytes_per_row;
-                    if prev_end <= unpacked_data.len() {
-                        Some(unpacked_data[prev_start..prev_end].to_vec())
+                    let prev_start = (y - 1) * bytes_per_row as u32;
+                    let prev_end = prev_start + bytes_per_row as u32;
+                    if prev_end <= unpacked_data.len() as u32 {
+                        Some(unpacked_data[prev_start as usize..prev_end as usize].to_vec())
                     } else {
                         None
                     }

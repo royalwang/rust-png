@@ -7,7 +7,6 @@ use std::thread;
 use std::time::Duration;
 
 /// Chunk流读取请求
-#[derive(Debug, Clone)]
 pub struct ReadRequest {
     pub length: usize,
     pub allow_less: bool,

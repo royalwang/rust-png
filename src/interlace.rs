@@ -181,17 +181,17 @@ pub fn deinterlace_passes(passes: &[Vec<u8>], width: u32, height: u32, bytes_per
         
         for y in 0..pass_height {
             for x in 0..pass_width {
-                let source_idx = (y * pass_width + x) * bytes_per_pixel;
+                let source_idx = (y * pass_width + x) * bytes_per_pixel as u32;
                 let target_x = x_offset + x * x_step;
                 let target_y = y_offset + y * y_step;
                 
                 if target_x < width && target_y < height {
-                    let target_idx = (target_y * width + target_x) * bytes_per_pixel;
+                    let target_idx = (target_y * width + target_x) * bytes_per_pixel as u32;
                     
-                    if source_idx + bytes_per_pixel <= pass_data.len() && 
-                       target_idx + bytes_per_pixel <= result.len() {
+                    if source_idx + bytes_per_pixel as u32 <= pass_data.len() as u32 && 
+                       target_idx + bytes_per_pixel as u32 <= result.len() as u32 {
                         for i in 0..bytes_per_pixel {
-                            result[target_idx + i] = pass_data[source_idx + i];
+                            result[(target_idx + i as u32) as usize] = pass_data[(source_idx + i as u32) as usize];
                         }
                     }
                 }
@@ -214,7 +214,7 @@ pub fn interlace_image(image_data: &[u8], width: u32, height: u32, bytes_per_pix
             continue;
         }
         
-        let mut pass_data = vec![0; (pass_width * pass_height * bytes_per_pixel) as usize];
+        let mut pass_data = vec![0; (pass_width * pass_height * bytes_per_pixel as u32) as usize];
         let (x_offset, y_offset, x_step, y_step) = get_interlace_offsets(pass);
         
         for y in 0..pass_height {
@@ -223,13 +223,13 @@ pub fn interlace_image(image_data: &[u8], width: u32, height: u32, bytes_per_pix
                 let source_y = y_offset + y * y_step;
                 
                 if source_x < width && source_y < height {
-                    let source_idx = (source_y * width + source_x) * bytes_per_pixel;
-                    let target_idx = (y * pass_width + x) * bytes_per_pixel;
+                let source_idx = (source_y * width + source_x) * bytes_per_pixel as u32;
+                let target_idx = (y * pass_width + x) * bytes_per_pixel as u32;
                     
-                    if source_idx + bytes_per_pixel <= image_data.len() && 
-                       target_idx + bytes_per_pixel <= pass_data.len() {
+                    if source_idx + bytes_per_pixel as u32 <= image_data.len() as u32 && 
+                       target_idx + bytes_per_pixel as u32 <= pass_data.len() as u32 {
                         for i in 0..bytes_per_pixel {
-                            pass_data[target_idx + i] = image_data[source_idx + i];
+                            pass_data[(target_idx + i as u32) as usize] = image_data[(source_idx + i as u32) as usize];
                         }
                     }
                 }
@@ -274,7 +274,7 @@ pub fn validate_interlace_data(passes: &[Vec<u8>], width: u32, height: u32, byte
             continue;
         }
         
-        let expected_size = (pass_width * pass_height * bytes_per_pixel) as usize;
+        let expected_size = (pass_width * pass_height * bytes_per_pixel as u32) as usize;
         if pass_data.len() != expected_size {
             return false;
         }

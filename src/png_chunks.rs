@@ -6,7 +6,7 @@ use crate::constants::*;
 use crate::crc::crc32;
 
 /// PNG Chunk类型
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum ChunkType {
     IHDR,
     IEND,

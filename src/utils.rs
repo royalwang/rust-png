@@ -5,10 +5,15 @@ use wasm_bindgen::prelude::*;
 use js_sys::{Array, Uint8Array, Uint8ClampedArray};
 
 /// 调试日志宏
-#[wasm_bindgen]
+#[cfg(target_arch = "wasm32")]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn log(s: &str) {
+    println!("{}", s);
 }
 
 macro_rules! console_log {

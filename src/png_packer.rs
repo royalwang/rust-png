@@ -80,9 +80,9 @@ impl PNGPacker {
         ihdr_data.write_all(&self.options.height.to_be_bytes()).map_err(|e| e.to_string())?;
         ihdr_data.write_all(&[self.options.bit_depth]).map_err(|e| e.to_string())?;
         ihdr_data.write_all(&[self.options.color_type]).map_err(|e| e.to_string())?;
-        ihdr_data.write_all(&[0])?; // compression method
-        ihdr_data.write_all(&[0])?; // filter method
-        ihdr_data.write_all(&[0])?; // interlace method
+        ihdr_data.write_all(&[0]).map_err(|e| e.to_string())?; // compression method
+        ihdr_data.write_all(&[0]).map_err(|e| e.to_string())?; // filter method
+        ihdr_data.write_all(&[0]).map_err(|e| e.to_string())?; // interlace method
         
         // 写入chunk
         self.write_chunk(output, TYPE_IHDR, &ihdr_data)?;
