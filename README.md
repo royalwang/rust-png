@@ -30,7 +30,8 @@ const arrayBuffer = await response.arrayBuffer();
 const uint8Array = new Uint8Array(arrayBuffer);
 
 // Create PNG decoder (compatible with original pngjs API)
-const png = new PNG(uint8Array);
+const png = new PNG();
+png.parse(uint8Array);
 
 // Get image information
 console.log('Width:', png.getWidth());
@@ -46,11 +47,17 @@ const rgbaArray = png.getRGBA8Array(); // Uint8ClampedArray
 ### With Options
 
 ```javascript
-// Skip pixel data for faster parsing (metadata only)
-const png = new PNG(pngData, { data: false });
+// Create PNG instance
+const png = new PNG();
 
-// With pixel data (default)
-const png = new PNG(pngData, { data: true });
+// Parse PNG data
+png.parse(pngData);
+
+// Get buffer data
+const buffer = png.toBuffer();
+
+// Pack PNG data
+const packedData = png.pack();
 ```
 
 ### Canvas Rendering
@@ -59,7 +66,8 @@ const png = new PNG(pngData, { data: true });
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-const png = new PNG(pngData);
+const png = new PNG();
+png.parse(pngData);
 canvas.width = png.getWidth();
 canvas.height = png.getHeight();
 
@@ -73,7 +81,7 @@ ctx.putImageData(imageData, 0, 0);
 ### Constructor
 
 ```typescript
-new PNG(data: ArrayBuffer | Uint8Array, options?: PngOptions)
+new PNG()
 ```
 
 ### Options

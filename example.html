@@ -106,9 +106,9 @@
                 
                 document.getElementById('status').textContent = 'Decoding PNG...';
                 
-                // Create PNG decoder with options
-                const options = { data: true };
-                currentPng = new PNG(uint8Array, options);
+                // Create PNG decoder (compatible with original pngjs API)
+                currentPng = new PNG();
+                currentPng.parse(uint8Array);
                 
                 displayImageInfo();
                 renderImage();
@@ -227,7 +227,8 @@ Palette: ${info.palette ? `${info.palette.length} bytes` : 'None'}`;
                 const uint8Array = new Uint8Array(arrayBuffer);
                 
                 try {
-                    currentPng = new PNG(uint8Array, { data: true });
+                    currentPng = new PNG();
+                    currentPng.parse(uint8Array);
                     displayImageInfo();
                     renderImage();
                     displayPixelData();

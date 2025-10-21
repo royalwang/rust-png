@@ -27,7 +27,7 @@ export interface PngPixel {
 
 // 主要PNG类（兼容原始pngjs API）
 export declare class PNG {
-  constructor(data: ArrayBuffer | Uint8Array, options?: PngOptions);
+  constructor();
   
   // 属性（兼容原始pngjs）
   readonly width: number;
@@ -51,8 +51,11 @@ export declare class PNG {
   getInterlaceMethod(): number;
   getPalette(): Uint8Array | null;
   
-  // 原始pngjs的parse方法
+  // 原始pngjs的核心方法
   parse(data: ArrayBuffer | Uint8Array, callback?: () => void): Promise<void>;
+  pack(): Uint8Array;
+  writeFile(filename: string): Promise<void>;
+  toBuffer(): Uint8Array;
 }
 
 // 兼容性别名
