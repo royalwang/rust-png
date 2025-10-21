@@ -1,0 +1,35 @@
+{
+  "name": "rust-png",
+  "version": "0.1.0",
+  "description": "A Rust implementation of pngjs with WASM support",
+  "main": "pkg/index.js",
+  "types": "pkg/index.d.ts",
+  "scripts": {
+    "build": "node build.js",
+    "build:full": "node build_and_test.js",
+    "build:debug": "wasm-pack build --target web --out-dir pkg --out-name index --dev",
+    "build:release": "wasm-pack build --target web --out-dir pkg --out-name index --release",
+    "clean": "rm -rf pkg target",
+    "test": "node test/test.js",
+    "test:compatibility": "node test_compatibility.js"
+  },
+  "keywords": [
+    "png",
+    "image",
+    "decoder",
+    "wasm",
+    "rust",
+    "pngjs"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "wasm-pack": "^0.12.0"
+  },
+  "files": [
+    "pkg/",
+    "src/",
+    "Cargo.toml",
+    "types.d.ts"
+  ]
+}

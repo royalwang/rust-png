@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust PNG Decoder Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+        .info {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <h1>Rust PNG Decoder Example</h1>
+    <p>This example demonstrates the Rust PNG decoder compiled to WebAssembly, providing 100% compatibility with the original pngjs library.</p>
+    
+    <div class="container">
+        <h3>Load PNG Image</h3>
+        <input type="file" id="fileInput" accept=".png" />
+        <button id="loadExample" disabled>Load Example Image</button>
+        <div id="status">Select a PNG file to decode...</div>
+    </div>
+
+    <div class="container">
+        <h3>Image Information</h3>
+        <div id="imageInfo" class="info">No image loaded</div>
+    </div>
+
+    <div class="container">
+        <h3>Rendered Image</h3>
+        <canvas id="canvas" width="0" height="0"></canvas>
+    </div>
+
+    <div class="container">
+        <h3>Pixel Data (First 10 pixels)</h3>
+        <div id="pixelData" class="info">No pixel data available</div>
+    </div>
+
+    <script type="module">
+        import init, { PNG } from './pkg/index.js';
+
+        let wasmModule = null;
+        let currentPng = null;
+
+        // Initialize WASM module
+        async function initWasm() {
+            try {
+                wasmModule = await init();
+                document.getElementById('loadExample').disabled = false;
+                document.getElementById('status').textContent = 'WASM module loaded successfully!';
+            } catch (error) {
+                document.getElementById('status').textContent = `Error loading WASM module: ${error.message}`;
+                console.error('WASM initialization error:', error);
+            }
+        }
+
+        // Load and decode PNG
+        async function loadPng(file) {
+            if (!wasmModule) {
+                document.getElementById('status').textContent = 'WASM module not loaded';
+                return;
+            }
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const uint8Array = new Uint8Array(arrayBuffer);
+                
+                document.getElementById('status').textContent = 'Decoding PNG...';
+                
+                // Create PNG decoder with options
+                const options = { data: true };
+                currentPng = new PNG(uint8Array, options);
+                
+                displayImageInfo();
+                renderImage();
+                displayPixelData();
+                
+                document.getElementById('status').textContent = 'PNG decoded successfully!';
+            } catch (error) {
+                document.getElementById('status').textContent = `Error decoding PNG: ${error.message}`;
+                console.error('PNG decoding error:', error);
+            }
+        }
+
+        // Display image information
+        function displayImageInfo() {
+            if (!currentPng) return;
+
+            const info = {
+                width: currentPng.getWidth(),
+                height: currentPng.getHeight(),
+                bitDepth: currentPng.getBitDepth(),
+                colorType: currentPng.getColorType(),
+                compressionMethod: currentPng.getCompressionMethod(),
+                filterMethod: currentPng.getFilterMethod(),
+                interlaceMethod: currentPng.getInterlaceMethod(),
+                palette: currentPng.getPalette()
+            };
+
+            const infoText = `Width: ${info.width}
+Height: ${info.height}
+Bit Depth: ${info.bitDepth}
+Color Type: ${info.colorType}
+Compression Method: ${info.compressionMethod}
+Filter Method: ${info.filterMethod}
+Interlace Method: ${info.interlaceMethod}
+Palette: ${info.palette ? `${info.palette.length} bytes` : 'None'}`;
+
+            document.getElementById('imageInfo').textContent = infoText;
+        }
+
+        // Render image to canvas
+        function renderImage() {
+            if (!currentPng) return;
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const width = currentPng.getWidth();
+            const height = currentPng.getHeight();
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            try {
+                const rgbaArray = currentPng.getRGBA8Array();
+                const imageData = ctx.createImageData(width, height);
+                imageData.data.set(rgbaArray);
+                ctx.putImageData(imageData, 0, 0);
+            } catch (error) {
+                console.error('Error rendering image:', error);
+            }
+        }
+
+        // Display pixel data
+        function displayPixelData() {
+            if (!currentPng) return;
+
+            const width = currentPng.getWidth();
+            const height = currentPng.getHeight();
+            const maxPixels = Math.min(10, width * height);
+            
+            let pixelText = '';
+            for (let i = 0; i < maxPixels; i++) {
+                const x = i % width;
+                const y = Math.floor(i / width);
+                
+                try {
+                    const pixel = currentPng.getPixel(x, y);
+                    pixelText += `Pixel (${x}, ${y}): R=${pixel[0]}, G=${pixel[1]}, B=${pixel[2]}, A=${pixel[3]}\n`;
+                } catch (error) {
+                    pixelText += `Pixel (${x}, ${y}): Error reading pixel\n`;
+                }
+            }
+            
+            document.getElementById('pixelData').textContent = pixelText;
+        }
+
+        // Event listeners
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && file.type === 'image/png') {
+                loadPng(file);
+            } else {
+                document.getElementById('status').textContent = 'Please select a valid PNG file';
+            }
+        });
+
+        document.getElementById('loadExample').addEventListener('click', async () => {
+            // Create a simple test PNG programmatically
+            const canvas = document.createElement('canvas');
+            canvas.width = 100;
+            canvas.height = 100;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw a gradient
+            const gradient = ctx.createLinearGradient(0, 0, 100, 100);
+            gradient.addColorStop(0, 'red');
+            gradient.addColorStop(0.5, 'green');
+            gradient.addColorStop(1, 'blue');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 100, 100);
+            
+            // Convert to PNG
+            canvas.toBlob(async (blob) => {
+                const arrayBuffer = await blob.arrayBuffer();
+                const uint8Array = new Uint8Array(arrayBuffer);
+                
+                try {
+                    currentPng = new PNG(uint8Array, { data: true });
+                    displayImageInfo();
+                    renderImage();
+                    displayPixelData();
+                    document.getElementById('status').textContent = 'Example image loaded successfully!';
+                } catch (error) {
+                    document.getElementById('status').textContent = `Error loading example: ${error.message}`;
+                }
+            }, 'image/png');
+        });
+
+        // Initialize on page load
+        initWasm();
+    </script>
+</body>
+</html>
