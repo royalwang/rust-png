@@ -1,0 +1,29 @@
+[package]
+name = "rust-png-examples"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rust-png = { path = ".." }
+rand = "0.8"
+num_cpus = "1.0"
+
+[[bin]]
+name = "basic_usage"
+path = "basic_usage.rs"
+
+[[bin]]
+name = "advanced_features"
+path = "advanced_features.rs"
+
+[[bin]]
+name = "wasm_optimization"
+path = "wasm_optimization.rs"
+
+[[bin]]
+name = "advanced_filters"
+path = "advanced_filters.rs"
+
+[[bin]]
+name = "complete_application"
+path = "complete_application.rs"
