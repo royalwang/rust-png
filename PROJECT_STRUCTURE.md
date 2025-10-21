@@ -15,7 +15,9 @@ src/
 ├── bitmap.rs           # 位图处理模块
 ├── utils.rs            # 工具函数
 ├── interlace.rs        # 交错图像处理模块
-└── png.rs              # PNG主结构体
+├── png.rs              # PNG主结构体（原始实现）
+├── png_structures.rs   # 语义化PNG结构定义
+└── png_semantic.rs     # 语义化PNG操作接口
 ```
 
 ### 🔧 模块职责
@@ -84,13 +86,32 @@ src/
 - 交错统计信息
 - 像素位置计算
 
-#### `png.rs` - PNG主结构
+#### `png.rs` - PNG主结构（原始实现）
 - PNG类实现
 - PNGSync类实现
 - 所有公共API方法
 - 像素操作
 - 图像处理
 - 交错图像支持
+
+#### `png_structures.rs` - 语义化PNG结构定义
+- 图像尺寸信息（ImageDimensions）
+- 颜色信息（ColorInfo）
+- 压缩信息（CompressionInfo）
+- 交错信息（InterlaceInfo）
+- 调色板信息（PaletteInfo）
+- Gamma信息（GammaInfo）
+- PNG元数据（PNGMetadata）
+- 像素数据管理（PixelData）
+- 操作状态（OperationState）
+- 统计信息（PNGStatistics）
+
+#### `png_semantic.rs` - 语义化PNG操作接口
+- 语义化PNG结构体（SemanticPNG）
+- 语义化PNG同步处理（SemanticPNGSync）
+- 富语义的API接口
+- 组合型结构设计
+- 类型安全的数据访问
 
 ### 🎯 设计原则
 

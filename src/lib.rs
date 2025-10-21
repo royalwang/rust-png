@@ -14,9 +14,12 @@ mod bitmap;
 mod utils;
 mod interlace;
 mod png;
+mod png_structures;
+mod png_semantic;
 
 // 重新导出主要类型
 pub use png::{PNG, PNGSync};
+pub use png_semantic::{SemanticPNG, SemanticPNGSync};
 
 // 当模块被加载时调用
 #[wasm_bindgen(start)]
