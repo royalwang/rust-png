@@ -1,0 +1,235 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  avatar    String?
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  isVerified Boolean @default(false)
+  emailVerificationToken String?
+  passwordResetToken     String?
+  passwordResetExpires   DateTime?
+  lastLoginAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关联关系
+  subscription Subscription?
+  images       Image[]
+  processingResults ProcessingResult[]
+  usageStats   UsageStats[]
+
+  @@map("users")
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  plan        SubscriptionPlan
+  status      SubscriptionStatus
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  subscriptionId String
+  stripeInvoiceId String?
+  amount      Int      // 以分为单位
+  currency    String   @default("usd")
+  status      InvoiceStatus
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联关系
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+model Image {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  originalName String
+  size        Int
+  type        String
+  url         String
+  thumbnailUrl  String?
+  width       Int
+  height      Int
+  format      String
+  metadata    Json?
+  tags        String[]
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  processingResults ProcessingResult[]
+
+  @@map("images")
+}
+
+model ProcessingResult {
+  id          String   @id @default(cuid())
+  userId      String
+  imageId     String
+  originalImageId String
+  name        String
+  size        Int
+  type        String
+  url         String
+  width       Int
+  height      Int
+  format      String
+  options     Json     // 处理选项
+  processingTime Int   // 处理时间(毫秒)
+  fileSizeReduction Float // 文件大小减少百分比
+  status      ProcessingStatus @default(COMPLETED)
+  errorMessage String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  image Image @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  originalImage Image @relation("OriginalImage", fields: [originalImageId], references: [id], onDelete: Cascade)
+
+  @@map("processing_results")
+}
+
+model UsageStats {
+  id          String   @id @default(cuid())
+  userId      String
+  date        DateTime @db.Date
+  imagesProcessed Int @default(0)
+  storageUsed Int @default(0) // 以字节为单位
+  apiCalls    Int @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("usage_stats")
+}
+
+model ProcessingTemplate {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  options     Json     // 处理选项
+  isPublic    Boolean  @default(false)
+  category    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("processing_templates")
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  key         String   @unique
+  permissions String[] // API权限
+  isActive    Boolean  @default(true)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("api_keys")
+}
+
+model Webhook {
+  id          String   @id @default(cuid())
+  userId      String
+  url         String
+  events      String[] // 订阅的事件
+  secret      String
+  isActive    Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("webhooks")
+}
+
+model SystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
+// 枚举类型
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  CANCELLED
+  PAST_DUE
+  UNPAID
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
