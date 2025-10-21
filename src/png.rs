@@ -12,6 +12,9 @@ use crate::bitmap::*;
 use crate::utils::*;
 use crate::interlace::*;
 use crate::png_packer::*;
+use crate::png_chunks::*;
+use crate::filter_pack::*;
+use crate::sync_inflate::*;
 
 /// PNG结构体 - 匹配原始pngjs库的PNG类
 #[wasm_bindgen]
@@ -38,6 +41,7 @@ pub struct PNG {
     interlace: bool,
     bpp: u8, // bytes per pixel
     depth: u8, // bit depth
+    chunk_parser: PNGChunkParser,
 }
 
 #[wasm_bindgen]
@@ -90,6 +94,7 @@ impl PNG {
             interlace: false,
             bpp: 4, // RGBA = 4 bytes per pixel
             depth: 8,
+            chunk_parser: PNGChunkParser::new(),
         }
     }
 
@@ -443,5 +448,19 @@ impl PNGSync {
     #[wasm_bindgen]
     pub fn write(png: &PNG, options: Option<JsValue>) -> Result<Vec<u8>, JsValue> {
         png.pack()
+    }
+}
+
+impl PNG {
+    /// 获取每像素字节数
+    fn get_bytes_per_pixel(&self) -> usize {
+        match self.color_type {
+            COLORTYPE_GRAYSCALE => 1,
+            COLORTYPE_COLOR => 3,
+            COLORTYPE_PALETTE_COLOR => 1,
+            COLORTYPE_GRAYSCALE | COLORTYPE_ALPHA => 2,
+            COLORTYPE_COLOR_ALPHA => 4,
+            _ => 4,
+        }
     }
 }
