@@ -1,0 +1,52 @@
+{
+  "name": "rust-png-saas-platform",
+  "version": "1.0.0",
+  "description": "基于Rust PNG JS构建的图片处理SaaS平台",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "image-processor",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:processor\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:processor": "cd image-processor && npm run dev",
+    "build": "npm run build:frontend && npm run build:backend && npm run build:processor",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "build:processor": "cd image-processor && npm run build",
+    "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\" \"npm run start:processor\"",
+    "start:frontend": "cd frontend && npm run start",
+    "start:backend": "cd backend && npm run start",
+    "start:processor": "cd image-processor && npm run start",
+    "test": "npm run test:frontend && npm run test:backend && npm run test:processor",
+    "test:frontend": "cd frontend && npm run test",
+    "test:backend": "cd backend && npm run test",
+    "test:processor": "cd image-processor && npm run test",
+    "lint": "npm run lint:frontend && npm run lint:backend && npm run lint:processor",
+    "lint:frontend": "cd frontend && npm run lint",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:processor": "cd image-processor && npm run lint",
+    "db:migrate": "cd backend && npm run db:migrate",
+    "db:seed": "cd backend && npm run db:seed",
+    "db:reset": "cd backend && npm run db:reset",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.0",
+    "@types/node": "^20.10.0",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
