@@ -11,6 +11,7 @@ use crate::constants::*;
 use crate::bitmap::*;
 use crate::utils::*;
 use crate::interlace::*;
+use crate::png_packer::*;
 
 /// PNG结构体 - 匹配原始pngjs库的PNG类
 #[wasm_bindgen]
@@ -181,10 +182,22 @@ impl PNG {
     /// 打包PNG数据 - 匹配原始pngjs库的pack方法
     #[wasm_bindgen]
     pub fn pack(&self) -> Result<Vec<u8>, JsValue> {
-        // 这里需要实现完整的PNG编码逻辑
-        // 目前返回RGBA数据作为占位符
-        if let Some(rgba_data) = &self.rgba_data {
-            Ok(rgba_data.clone())
+        if let Some(ref data) = self.rgba_data {
+            let options = PackerOptions {
+                width: self.width,
+                height: self.height,
+                bit_depth: self.bit_depth,
+                color_type: self.color_type,
+                input_color_type: self.color_type,
+                input_has_alpha: self.alpha,
+                ..Default::default()
+            };
+            
+            let packer = PNGPacker::new(options);
+            match packer.pack(data) {
+                Ok(packed_data) => Ok(packed_data),
+                Err(e) => Err(JsValue::from_str(&e)),
+            }
         } else {
             Err(JsValue::from_str("No image data to pack"))
         }

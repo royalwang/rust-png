@@ -13,6 +13,7 @@ mod filter_optimizer;
 mod bitmap;
 mod utils;
 mod interlace;
+mod png_packer;
 mod png;
 mod png_structures;
 mod png_semantic;
