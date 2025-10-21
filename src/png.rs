@@ -15,6 +15,7 @@ use crate::png_packer::*;
 use crate::png_chunks::*;
 use crate::filter_pack::*;
 use crate::sync_inflate::*;
+use crate::bitmapper::*;
 
 /// PNG结构体 - 匹配原始pngjs库的PNG类
 #[wasm_bindgen]
