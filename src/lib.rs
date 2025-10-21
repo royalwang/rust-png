@@ -1,8 +1,9 @@
 use wasm_bindgen::prelude::*;
-use png::{Decoder, ColorType, BitDepth};
+use png::{Decoder, ColorType, BitDepth, Transformations};
 use std::io::Cursor;
 use js_sys::{Array, Uint8Array, Uint8ClampedArray};
 use web_sys::console;
+use std::collections::HashMap;
 
 // 导入console.log用于调试
 #[wasm_bindgen]
@@ -13,6 +14,163 @@ extern "C" {
 
 macro_rules! console_log {
     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
+}
+
+// PNG常量定义 (匹配原始pngjs库)
+const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+// Chunk类型
+const TYPE_IHDR: u32 = 0x49484452;
+const TYPE_IEND: u32 = 0x49454e44;
+const TYPE_IDAT: u32 = 0x49444154;
+const TYPE_PLTE: u32 = 0x504c5445;
+const TYPE_tRNS: u32 = 0x74524e53;
+const TYPE_gAMA: u32 = 0x67414d41;
+
+// 颜色类型
+const COLORTYPE_GRAYSCALE: u8 = 0;
+const COLORTYPE_PALETTE: u8 = 1;
+const COLORTYPE_COLOR: u8 = 2;
+const COLORTYPE_ALPHA: u8 = 4;
+const COLORTYPE_PALETTE_COLOR: u8 = 3;
+const COLORTYPE_COLOR_ALPHA: u8 = 6;
+
+// 滤镜类型
+const FILTER_NONE: u8 = 0;
+const FILTER_SUB: u8 = 1;
+const FILTER_UP: u8 = 2;
+const FILTER_AVERAGE: u8 = 3;
+const FILTER_PAETH: u8 = 4;
+
+// CRC计算表 (匹配原始pngjs库)
+const CRC_TABLE: [u32; 256] = [
+    0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
+    0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
+    0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91, 0x1db71064, 0x6ab020f2,
+    0xf3b97148, 0x84be41de, 0x1adad47d, 0x6ddde4eb, 0xf4d4b551, 0x83d385c7,
+    0x136c9856, 0x646ba8c0, 0xfd62f97a, 0x8a65c9ec, 0x14015c4f, 0x63066cd9,
+    0xfa0f3d63, 0x8d080df5, 0x3b6e20c8, 0x4c69105e, 0xd56041e4, 0xa2677172,
+    0x3c03e4d1, 0x4b04d447, 0xd20d85fd, 0xa50ab56b, 0x35b5a8fa, 0x42b2986c,
+    0xdbbbc9d6, 0xacbcf940, 0x32d86ce3, 0x45df5c75, 0xdcd60dcf, 0xabd13d59,
+    0x26d930ac, 0x51de003a, 0xc8d75180, 0xbfd06116, 0x21b4f4b5, 0x56b3c423,
+    0xcfba9599, 0xb8bda50f, 0x2802b89e, 0x5f058808, 0xc60cd9b2, 0xb10be924,
+    0x2f6f7c87, 0x58684c11, 0xc1611dab, 0xb6662d3d, 0x76dc4190, 0x01db7106,
+    0x98d220bc, 0xefd5102a, 0x71b18589, 0x06b6b51f, 0x9fbfe4a5, 0xe8b8d433,
+    0x7807c9a2, 0x0f00f934, 0x9609a88e, 0xe10e9818, 0x7f6a0dbb, 0x086d3d2d,
+    0x91646c97, 0xe6635c01, 0x6b6b51f4, 0x1c6c6162, 0x856530d8, 0xf262004e,
+    0x6c0695ed, 0x1b01a57b, 0x8208f4c1, 0xf50fc457, 0x65b0d9c6, 0x12b7e950,
+    0x8bbeb8ea, 0xfcb9887c, 0x62dd1ddf, 0x15da2d49, 0x8cd37cf3, 0xfbd44c65,
+    0x4db26158, 0x3ab551ce, 0xa3bc0074, 0xd4bb30e2, 0x4adfa541, 0x3dd895d7,
+    0xa4d1c46d, 0xd3d6f4fb, 0x4369e96a, 0x346ed9fc, 0xad678846, 0xda60b8d0,
+    0x44042d73, 0x33031de5, 0xaa0a4c5f, 0xdd0d7cc9, 0x5005713c, 0x270241aa,
+    0xbe0b1010, 0xc90c2086, 0x5768b525, 0x206f85b3, 0xb966d409, 0xce61e49f,
+    0x5edef90e, 0x29d9c998, 0xb0d09822, 0xc7d7a8b4, 0x59b33d17, 0x2eb40d81,
+    0xb7bd5c3b, 0xc0ba6cad, 0xedb88320, 0x9abfb3b6, 0x03b6e20c, 0x74b1d29a,
+    0xead54739, 0x9dd277af, 0x04db2615, 0x73dc1683, 0xe3630b12, 0x94643b84,
+    0x0d6d6a3e, 0x7a6a5aa8, 0xe40ecf0b, 0x9309ff9d, 0x0a00ae27, 0x7d079eb1,
+    0xf00f9344, 0x8708a3d2, 0x1e01f268, 0x6906c2fe, 0xf762575d, 0x806567cb,
+    0x196c3671, 0x6e6b06e7, 0xfed41b76, 0x89d32be0, 0x10da7a5a, 0x67dd4acc,
+    0xf9b9df6f, 0x8ebeeff9, 0x17b7be43, 0x60b08ed5, 0xd6d6a3e8, 0xa1d1937e,
+    0x38d8c2c4, 0x4fdff252, 0xd1bb67f1, 0xa6bc5767, 0x3fb506dd, 0x48b2364b,
+    0xd80d2bda, 0xaf0a1b4c, 0x36034af6, 0x41047a60, 0xdf60efc3, 0xa867df55,
+    0x316e8eef, 0x4669be79, 0xcb61b38c, 0xbc66831a, 0x256fd2a0, 0x5268e236,
+    0xcc0c7795, 0xbb0b4703, 0x220216b9, 0x5505262f, 0xc5ba3bbe, 0xb2bd0b28,
+    0x2bb45a92, 0x5cb36a04, 0xc2d7ffa7, 0xb5d0cf31, 0x2cd99e8b, 0x5bdeae1d,
+    0x9b64c2b0, 0xec63f226, 0x756aa39c, 0x026d930a, 0x9c0906a9, 0xeb0e363f,
+    0x72076785, 0x05005713, 0x95bf4a82, 0xe2b87a14, 0x7bb12bae, 0x0cb61b38,
+    0x92d28e9b, 0xe5d5be0d, 0x7cdcefb7, 0x0bdbdf21, 0x86d3d2d4, 0xf1d4e242,
+    0x68ddb3f8, 0x1fda836e, 0x81be16cd, 0xf6b9265b, 0x6fb077e1, 0x18b74777,
+    0x88085ae6, 0xff0f6a70, 0x66063bca, 0x11010b5c, 0x8f659eff, 0xf862ae69,
+    0x616bffd3, 0x166ccf45, 0xa00ae278, 0xd70dd2ee, 0x4e048354, 0x3903b3c2,
+    0xa7672661, 0xd06016f7, 0x4969474d, 0x3e6e77db, 0xaed16a4a, 0xd9d65adc,
+    0x40df0b66, 0x37d83bf0, 0xa9bcae53, 0xdebb9ec5, 0x47b2cf7f, 0x30b5ffe9,
+    0xbdbdf21c, 0xcabac28a, 0x53b39330, 0x24b4a3a6, 0xbad03605, 0xcdd70693,
+    0x54de5729, 0x23d967bf, 0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
+    0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
+];
+
+// CRC计算函数
+fn crc32(data: &[u8]) -> u32 {
+    let mut crc = 0xffffffff;
+    for &byte in data {
+        crc = CRC_TABLE[((crc ^ (byte as u32)) & 0xff) as usize] ^ (crc >> 8);
+    }
+    crc ^ 0xffffffff
+}
+
+// Paeth预测器 (匹配原始pngjs库)
+fn paeth_predictor(a: u8, b: u8, c: u8) -> u8 {
+    let p = (a as i16) + (b as i16) - (c as i16);
+    let pa = (p - (a as i16)).abs();
+    let pb = (p - (b as i16)).abs();
+    let pc = (p - (c as i16)).abs();
+    
+    if pa <= pb && pa <= pc {
+        a
+    } else if pb <= pc {
+        b
+    } else {
+        c
+    }
+}
+
+// 滤镜处理函数
+fn apply_filter(filter_type: u8, data: &mut [u8], width: usize, bpp: usize) {
+    let bytes_per_row = width * bpp;
+    
+    for y in 0..(data.len() / bytes_per_row) {
+        let row_start = y * bytes_per_row;
+        let row_end = row_start + bytes_per_row;
+        
+        if row_end > data.len() {
+            break;
+        }
+        
+        let row = &mut data[row_start..row_end];
+        
+        match filter_type {
+            FILTER_NONE => {
+                // 无滤镜，直接使用原始数据
+            }
+            FILTER_SUB => {
+                // Sub滤镜：当前像素 - 左像素
+                for x in bpp..bytes_per_row {
+                    row[x] = row[x].wrapping_add(row[x - bpp]);
+                }
+            }
+            FILTER_UP => {
+                // Up滤镜：当前像素 - 上像素
+                if y > 0 {
+                    let prev_row_start = (y - 1) * bytes_per_row;
+                    for x in 0..bytes_per_row {
+                        row[x] = row[x].wrapping_add(data[prev_row_start + x]);
+                    }
+                }
+            }
+            FILTER_AVERAGE => {
+                // Average滤镜：当前像素 - (左像素 + 上像素) / 2
+                for x in 0..bytes_per_row {
+                    let left = if x >= bpp { row[x - bpp] } else { 0 };
+                    let up = if y > 0 { data[(y - 1) * bytes_per_row + x] } else { 0 };
+                    let average = ((left as u16 + up as u16) / 2) as u8;
+                    row[x] = row[x].wrapping_add(average);
+                }
+            }
+            FILTER_PAETH => {
+                // Paeth滤镜：使用Paeth预测器
+                for x in 0..bytes_per_row {
+                    let left = if x >= bpp { row[x - bpp] } else { 0 };
+                    let up = if y > 0 { data[(y - 1) * bytes_per_row + x] } else { 0 };
+                    let up_left = if y > 0 && x >= bpp { data[(y - 1) * bytes_per_row + x - bpp] } else { 0 };
+                    let predictor = paeth_predictor(left, up, up_left);
+                    row[x] = row[x].wrapping_add(predictor);
+                }
+            }
+            _ => {
+                // 未知滤镜类型，保持原样
+            }
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -32,6 +190,13 @@ pub struct PNG {
     alpha: bool,
     readable: bool,
     writable: bool,
+    // 新增的元数据字段
+    chunks: HashMap<String, Vec<u8>>,
+    has_ihdr: bool,
+    has_iend: bool,
+    interlace: bool,
+    bpp: u8, // bytes per pixel
+    depth: u8, // bit depth
 }
 
 #[wasm_bindgen]
@@ -77,6 +242,12 @@ impl PNG {
             alpha: false,
             readable: true,
             writable: true,
+            chunks: HashMap::new(),
+            has_ihdr: false,
+            has_iend: false,
+            interlace: false,
+            bpp: 4, // RGBA = 4 bytes per pixel
+            depth: 8,
         }
     }
 
@@ -578,6 +749,111 @@ impl PNGSync {
     #[wasm_bindgen]
     pub fn write(png: &PNG, options: Option<JsValue>) -> Result<Vec<u8>, JsValue> {
         png.pack()
+    }
+}
+
+// 位深度转换函数
+fn scale_depth(input: &[u8], output: &mut [u8], width: usize, height: usize, input_depth: u8, output_depth: u8) {
+    let input_bpp = if input_depth <= 8 { 1 } else { 2 };
+    let output_bpp = if output_depth <= 8 { 1 } else { 2 };
+    
+    let max_input = (1u16 << input_depth) - 1;
+    let max_output = (1u16 << output_depth) - 1;
+    
+    for y in 0..height {
+        for x in 0..width {
+            let input_idx = (y * width + x) * input_bpp;
+            let output_idx = (y * width + x) * output_bpp;
+            
+            if input_depth <= 8 && output_depth <= 8 {
+                // 8位到8位
+                let value = input[input_idx] as u16;
+                let scaled = (value * max_output / max_input) as u8;
+                output[output_idx] = scaled;
+            } else if input_depth <= 8 && output_depth > 8 {
+                // 8位到16位
+                let value = input[input_idx] as u16;
+                let scaled = (value * max_output / max_input) as u16;
+                output[output_idx] = (scaled >> 8) as u8;
+                output[output_idx + 1] = (scaled & 0xff) as u8;
+            } else if input_depth > 8 && output_depth <= 8 {
+                // 16位到8位
+                let value = ((input[input_idx] as u16) << 8) | (input[input_idx + 1] as u16);
+                let scaled = (value * max_output / max_input) as u8;
+                output[output_idx] = scaled;
+            } else {
+                // 16位到16位
+                let value = ((input[input_idx] as u16) << 8) | (input[input_idx + 1] as u16);
+                let scaled = (value * max_output / max_input) as u16;
+                output[output_idx] = (scaled >> 8) as u8;
+                output[output_idx + 1] = (scaled & 0xff) as u8;
+            }
+        }
+    }
+}
+
+// 调色板处理函数
+fn de_palette(input: &[u8], output: &mut [u8], width: usize, height: usize, palette: &[u8]) {
+    let mut px_pos = 0;
+    
+    for _y in 0..height {
+        for _x in 0..width {
+            let color_idx = input[px_pos] as usize * 3;
+            
+            if color_idx + 2 < palette.len() {
+                output[px_pos * 4] = palette[color_idx];     // R
+                output[px_pos * 4 + 1] = palette[color_idx + 1]; // G
+                output[px_pos * 4 + 2] = palette[color_idx + 2]; // B
+                output[px_pos * 4 + 3] = 255; // A
+            } else {
+                output[px_pos * 4] = 0;
+                output[px_pos * 4 + 1] = 0;
+                output[px_pos * 4 + 2] = 0;
+                output[px_pos * 4 + 3] = 255;
+            }
+            
+            px_pos += 1;
+        }
+    }
+}
+
+// 透明度颜色处理
+fn replace_transparent_color(input: &[u8], output: &mut [u8], width: usize, height: usize, trans_color: &[u16]) {
+    let mut px_pos = 0;
+    
+    for _y in 0..height {
+        for _x in 0..width {
+            let mut make_trans = false;
+            
+            if trans_color.len() == 1 {
+                // 灰度透明度
+                if trans_color[0] == input[px_pos] as u16 {
+                    make_trans = true;
+                }
+            } else if trans_color.len() == 3 {
+                // RGB透明度
+                if px_pos + 2 < input.len() &&
+                   trans_color[0] == input[px_pos] as u16 &&
+                   trans_color[1] == input[px_pos + 1] as u16 &&
+                   trans_color[2] == input[px_pos + 2] as u16 {
+                    make_trans = true;
+                }
+            }
+            
+            if make_trans {
+                output[px_pos * 4] = 0;
+                output[px_pos * 4 + 1] = 0;
+                output[px_pos * 4 + 2] = 0;
+                output[px_pos * 4 + 3] = 0;
+            } else {
+                output[px_pos * 4] = input[px_pos];
+                output[px_pos * 4 + 1] = if px_pos + 1 < input.len() { input[px_pos + 1] } else { input[px_pos] };
+                output[px_pos * 4 + 2] = if px_pos + 2 < input.len() { input[px_pos + 2] } else { input[px_pos] };
+                output[px_pos * 4 + 3] = 255;
+            }
+            
+            px_pos += 1;
+        }
     }
 }
 
