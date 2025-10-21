@@ -9,6 +9,7 @@ mod crc;
 mod filter;
 mod bitmap;
 mod utils;
+mod interlace;
 mod png;
 
 // 重新导出主要类型

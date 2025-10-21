@@ -10,6 +10,7 @@ use std::io::Cursor;
 use crate::constants::*;
 use crate::bitmap::*;
 use crate::utils::*;
+use crate::interlace::*;
 
 /// PNG结构体 - 匹配原始pngjs库的PNG类
 #[wasm_bindgen]
@@ -362,6 +363,52 @@ impl PNG {
             }
             array
         })
+    }
+
+    /// 获取交错通道信息
+    #[wasm_bindgen]
+    pub fn get_interlace_passes(&self) -> Result<Array, JsValue> {
+        let passes = get_interlace_passes(self.width, self.height);
+        let array = Array::new();
+        
+        for pass in passes {
+            let pass_obj = js_sys::Object::new();
+            js_sys::Reflect::set(&pass_obj, &"pass".into(), &pass.pass.into())?;
+            js_sys::Reflect::set(&pass_obj, &"width".into(), &pass.width.into())?;
+            js_sys::Reflect::set(&pass_obj, &"height".into(), &pass.height.into())?;
+            js_sys::Reflect::set(&pass_obj, &"xOffset".into(), &pass.x_offset.into())?;
+            js_sys::Reflect::set(&pass_obj, &"yOffset".into(), &pass.y_offset.into())?;
+            js_sys::Reflect::set(&pass_obj, &"xStep".into(), &pass.x_step.into())?;
+            js_sys::Reflect::set(&pass_obj, &"yStep".into(), &pass.y_step.into())?;
+            array.push(&pass_obj);
+        }
+        
+        Ok(array)
+    }
+
+    /// 检查是否为交错图像
+    #[wasm_bindgen]
+    pub fn is_interlaced(&self) -> bool {
+        self.interlace
+    }
+
+    /// 获取交错统计信息
+    #[wasm_bindgen]
+    pub fn get_interlace_stats(&self) -> Result<js_sys::Object, JsValue> {
+        let stats = get_interlace_stats(self.width, self.height);
+        let obj = js_sys::Object::new();
+        
+        js_sys::Reflect::set(&obj, &"totalPasses".into(), &stats.total_passes.into())?;
+        js_sys::Reflect::set(&obj, &"totalPixels".into(), &stats.total_pixels.into())?;
+        js_sys::Reflect::set(&obj, &"compressionRatio".into(), &stats.compression_ratio.into())?;
+        
+        let pass_sizes = Array::new();
+        for size in stats.pass_sizes {
+            pass_sizes.push(&size.into());
+        }
+        js_sys::Reflect::set(&obj, &"passSizes".into(), &pass_sizes)?;
+        
+        Ok(obj)
     }
 }
 
