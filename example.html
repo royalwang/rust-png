@@ -57,6 +57,9 @@
         <h3>Load PNG Image</h3>
         <input type="file" id="fileInput" accept=".png" />
         <button id="loadExample" disabled>Load Example Image</button>
+        <button id="testSync" disabled>Test Sync API</button>
+        <button id="testBitblt" disabled>Test Bitblt</button>
+        <button id="testGamma" disabled>Test Gamma Correction</button>
         <div id="status">Select a PNG file to decode...</div>
     </div>
 
@@ -76,7 +79,7 @@
     </div>
 
     <script type="module">
-        import init, { PNG } from './pkg/index.js';
+        import init, { PNG, PNGSync } from './pkg/index.js';
 
         let wasmModule = null;
         let currentPng = null;
@@ -86,6 +89,9 @@
             try {
                 wasmModule = await init();
                 document.getElementById('loadExample').disabled = false;
+                document.getElementById('testSync').disabled = false;
+                document.getElementById('testBitblt').disabled = false;
+                document.getElementById('testGamma').disabled = false;
                 document.getElementById('status').textContent = 'WASM module loaded successfully!';
             } catch (error) {
                 document.getElementById('status').textContent = `Error loading WASM module: ${error.message}`;
@@ -237,6 +243,102 @@ Palette: ${info.palette ? `${info.palette.length} bytes` : 'None'}`;
                     document.getElementById('status').textContent = `Error loading example: ${error.message}`;
                 }
             }, 'image/png');
+        });
+
+        // Test Sync API
+        document.getElementById('testSync').addEventListener('click', async () => {
+            try {
+                // Create a simple test PNG
+                const canvas = document.createElement('canvas');
+                canvas.width = 50;
+                canvas.height = 50;
+                const ctx = canvas.getContext('2d');
+                
+                // Draw a simple pattern
+                ctx.fillStyle = 'red';
+                ctx.fillRect(0, 0, 25, 25);
+                ctx.fillStyle = 'blue';
+                ctx.fillRect(25, 0, 25, 25);
+                ctx.fillStyle = 'green';
+                ctx.fillRect(0, 25, 25, 25);
+                ctx.fillStyle = 'yellow';
+                ctx.fillRect(25, 25, 25, 25);
+                
+                canvas.toBlob(async (blob) => {
+                    const arrayBuffer = await blob.arrayBuffer();
+                    const uint8Array = new Uint8Array(arrayBuffer);
+                    
+                    // Test sync API
+                    const png = PNGSync.read(uint8Array);
+                    console.log('Sync API test - Width:', png.getWidth(), 'Height:', png.getHeight());
+                    
+                    // Test packing
+                    const packedData = PNGSync.write(png);
+                    console.log('Sync API test - Packed data length:', packedData.length);
+                    
+                    document.getElementById('status').textContent = 'Sync API test completed successfully!';
+                }, 'image/png');
+            } catch (error) {
+                document.getElementById('status').textContent = `Sync API test failed: ${error.message}`;
+                console.error('Sync API test error:', error);
+            }
+        });
+
+        // Test Bitblt
+        document.getElementById('testBitblt').addEventListener('click', async () => {
+            try {
+                if (!currentPng) {
+                    document.getElementById('status').textContent = 'Please load an image first';
+                    return;
+                }
+                
+                // Create a destination PNG
+                const dstPng = new PNG({ width: 100, height: 100, fill: true });
+                
+                // Copy a portion of the source image to destination
+                currentPng.bitblt(dstPng, 0, 0, Math.min(50, currentPng.getWidth()), Math.min(50, currentPng.getHeight()), 25, 25);
+                
+                // Render the result
+                const canvas = document.getElementById('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 100;
+                canvas.height = 100;
+                
+                const imageData = ctx.createImageData(100, 100);
+                imageData.data.set(dstPng.getRGBA8Array());
+                ctx.putImageData(imageData, 0, 0);
+                
+                document.getElementById('status').textContent = 'Bitblt test completed successfully!';
+            } catch (error) {
+                document.getElementById('status').textContent = `Bitblt test failed: ${error.message}`;
+                console.error('Bitblt test error:', error);
+            }
+        });
+
+        // Test Gamma Correction
+        document.getElementById('testGamma').addEventListener('click', async () => {
+            try {
+                if (!currentPng) {
+                    document.getElementById('status').textContent = 'Please load an image first';
+                    return;
+                }
+                
+                // Set gamma value
+                currentPng.setGamma(2.2);
+                console.log('Original gamma:', currentPng.gamma);
+                
+                // Apply gamma correction
+                currentPng.adjustGamma();
+                console.log('After gamma correction:', currentPng.gamma);
+                
+                // Re-render the image
+                renderImage();
+                
+                document.getElementById('status').textContent = 'Gamma correction test completed successfully!';
+            } catch (error) {
+                document.getElementById('status').textContent = `Gamma correction test failed: ${error.message}`;
+                console.error('Gamma correction test error:', error);
+            }
         });
 
         // Initialize on page load

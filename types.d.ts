@@ -27,7 +27,7 @@ export interface PngPixel {
 
 // 主要PNG类（兼容原始pngjs API）
 export declare class PNG {
-  constructor();
+  constructor(options?: PngOptions);
   
   // 属性（兼容原始pngjs）
   readonly width: number;
@@ -38,12 +38,14 @@ export declare class PNG {
   readonly filterMethod: number;
   readonly interlaceMethod: number;
   data?: Uint8ClampedArray; // 像素数据
+  gamma: number;
+  alpha: boolean;
+  readable: boolean;
+  writable: boolean;
   
-  // 方法（兼容原始pngjs）
+  // 基本方法
   getWidth(): number;
   getHeight(): number;
-  getPixel(x: number, y: number): PngPixel;
-  getRGBA8Array(): Uint8ClampedArray;
   getBitDepth(): number;
   getColorType(): number;
   getCompressionMethod(): number;
@@ -51,11 +53,27 @@ export declare class PNG {
   getInterlaceMethod(): number;
   getPalette(): Uint8Array | null;
   
+  // 像素操作
+  getPixel(x: number, y: number): PngPixel;
+  setPixel(x: number, y: number, r: number, g: number, b: number, a: number): void;
+  getRGBA8Array(): Uint8ClampedArray;
+  
   // 原始pngjs的核心方法
   parse(data: ArrayBuffer | Uint8Array, callback?: () => void): Promise<void>;
   pack(): Uint8Array;
   writeFile(filename: string): Promise<void>;
   toBuffer(): Uint8Array;
+  
+  // 图像操作
+  bitblt(dst: PNG, srcX: number, srcY: number, width: number, height: number, deltaX: number, deltaY: number): void;
+  adjustGamma(): void;
+  getTransColor(): Uint8Array | null;
+}
+
+// 同步API（兼容原始pngjs）
+export declare class PNGSync {
+  static read(buffer: ArrayBuffer | Uint8Array, options?: PngOptions): PNG;
+  static write(png: PNG, options?: PngOptions): Uint8Array;
 }
 
 // 兼容性别名

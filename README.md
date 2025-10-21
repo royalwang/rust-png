@@ -22,16 +22,15 @@ npm install rust-png
 ### Basic Usage
 
 ```javascript
-import { PNG } from 'rust-png';
+import { PNG, PNGSync } from 'rust-png';
 
-// Load PNG data
-const response = await fetch('image.png');
-const arrayBuffer = await response.arrayBuffer();
-const uint8Array = new Uint8Array(arrayBuffer);
-
-// Create PNG decoder (compatible with original pngjs API)
+// Async API (compatible with original pngjs)
 const png = new PNG();
-png.parse(uint8Array);
+png.parse(pngData);
+
+// Sync API (compatible with original pngjs)
+const png = PNGSync.read(pngData);
+const packedData = PNGSync.write(png);
 
 // Get image information
 console.log('Width:', png.getWidth());
@@ -39,9 +38,14 @@ console.log('Height:', png.getHeight());
 console.log('Bit Depth:', png.getBitDepth());
 console.log('Color Type:', png.getColorType());
 
-// Get pixel data
+// Pixel operations
 const pixel = png.getPixel(10, 20); // [R, G, B, A]
+png.setPixel(10, 20, 255, 0, 0, 255); // Set red pixel
 const rgbaArray = png.getRGBA8Array(); // Uint8ClampedArray
+
+// Image operations
+png.bitblt(dstPng, 0, 0, 50, 50, 10, 10); // Copy region
+png.adjustGamma(); // Apply gamma correction
 ```
 
 ### With Options

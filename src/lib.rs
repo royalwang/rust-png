@@ -27,15 +27,43 @@ pub struct PNG {
     palette: Option<Vec<u8>>,
     pixel_data: Option<Vec<u8>>,
     rgba_data: Option<Vec<u8>>,
+    gamma: f64,
+    trans_color: Option<Vec<u16>>,
+    alpha: bool,
+    readable: bool,
+    writable: bool,
 }
 
 #[wasm_bindgen]
 impl PNG {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> PNG {
+    pub fn new(options: Option<JsValue>) -> PNG {
+        let mut width = 0;
+        let mut height = 0;
+        let mut fill = false;
+        
+        // 解析选项
+        if let Some(opts) = options {
+            if let Ok(parsed) = serde_wasm_bindgen::from_value::<serde_json::Value>(opts) {
+                width = parsed.get("width").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                height = parsed.get("height").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                fill = parsed.get("fill").and_then(|v| v.as_bool()).unwrap_or(false);
+            }
+        }
+        
+        let mut rgba_data = None;
+        if width > 0 && height > 0 {
+            let data_size = (4 * width * height) as usize;
+            let mut data = vec![0; data_size];
+            if fill {
+                data.fill(0);
+            }
+            rgba_data = Some(data);
+        }
+        
         PNG {
-            width: 0,
-            height: 0,
+            width,
+            height,
             bit_depth: 8,
             color_type: 2,
             compression_method: 0,
@@ -43,7 +71,12 @@ impl PNG {
             interlace_method: 0,
             palette: None,
             pixel_data: None,
-            rgba_data: None,
+            rgba_data,
+            gamma: 0.0,
+            trans_color: None,
+            alpha: false,
+            readable: true,
+            writable: true,
         }
     }
 
@@ -294,6 +327,135 @@ impl PNG {
             Err(JsValue::from_str("No data available"))
         }
     }
+
+    // 原始pngjs的bitblt方法 - 位块传输
+    #[wasm_bindgen]
+    pub fn bitblt(&self, dst: &mut PNG, src_x: u32, src_y: u32, width: u32, height: u32, delta_x: u32, delta_y: u32) -> Result<(), JsValue> {
+        // 检查源图像边界
+        if src_x > self.width || src_y > self.height || 
+           src_x + width > self.width || src_y + height > self.height {
+            return Err(JsValue::from_str("bitblt reading outside image"));
+        }
+        
+        // 检查目标图像边界
+        if delta_x > dst.width || delta_y > dst.height || 
+           delta_x + width > dst.width || delta_y + height > dst.height {
+            return Err(JsValue::from_str("bitblt writing outside image"));
+        }
+        
+        if let (Some(src_data), Some(dst_data)) = (&self.rgba_data, &mut dst.rgba_data) {
+            for y in 0..height {
+                let src_start = ((src_y + y) * self.width + src_x) as usize * 4;
+                let src_end = ((src_y + y) * self.width + src_x + width) as usize * 4;
+                let dst_start = ((delta_y + y) * dst.width + delta_x) as usize * 4;
+                
+                if src_start < src_data.len() && src_end <= src_data.len() && 
+                   dst_start + (src_end - src_start) <= dst_data.len() {
+                    dst_data[dst_start..dst_start + (src_end - src_start)]
+                        .copy_from_slice(&src_data[src_start..src_end]);
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    // 原始pngjs的adjustGamma方法
+    #[wasm_bindgen]
+    pub fn adjust_gamma(&mut self) {
+        if self.gamma > 0.0 && self.rgba_data.is_some() {
+            if let Some(data) = &mut self.rgba_data {
+                for y in 0..self.height {
+                    for x in 0..self.width {
+                        let idx = ((self.width * y + x) * 4) as usize;
+                        
+                        for i in 0..3 {
+                            if idx + i < data.len() {
+                                let sample = data[idx + i] as f64 / 255.0;
+                                let adjusted = sample.powf(1.0 / 2.2 / self.gamma);
+                                data[idx + i] = (adjusted * 255.0).round() as u8;
+                            }
+                        }
+                    }
+                }
+            }
+            self.gamma = 0.0;
+        }
+    }
+
+    // 获取像素值
+    #[wasm_bindgen]
+    pub fn get_pixel(&self, x: u32, y: u32) -> Result<Array, JsValue> {
+        if x >= self.width || y >= self.height {
+            return Err(JsValue::from_str("Pixel coordinates out of bounds"));
+        }
+
+        let rgba_data = self.rgba_data.as_ref()
+            .ok_or_else(|| JsValue::from_str("No pixel data available"))?;
+
+        let index = ((y * self.width + x) * 4) as usize;
+        if index + 3 >= rgba_data.len() {
+            return Err(JsValue::from_str("Invalid pixel index"));
+        }
+
+        let pixel = Array::new();
+        pixel.push(&JsValue::from(rgba_data[index]));     // Red
+        pixel.push(&JsValue::from(rgba_data[index + 1])); // Green
+        pixel.push(&JsValue::from(rgba_data[index + 2])); // Blue
+        pixel.push(&JsValue::from(rgba_data[index + 3])); // Alpha
+
+        Ok(pixel)
+    }
+
+    // 设置像素值
+    #[wasm_bindgen]
+    pub fn set_pixel(&mut self, x: u32, y: u32, r: u8, g: u8, b: u8, a: u8) -> Result<(), JsValue> {
+        if x >= self.width || y >= self.height {
+            return Err(JsValue::from_str("Pixel coordinates out of bounds"));
+        }
+
+        if let Some(rgba_data) = &mut self.rgba_data {
+            let index = ((y * self.width + x) * 4) as usize;
+            if index + 3 < rgba_data.len() {
+                rgba_data[index] = r;
+                rgba_data[index + 1] = g;
+                rgba_data[index + 2] = b;
+                rgba_data[index + 3] = a;
+            }
+        }
+
+        Ok(())
+    }
+
+    // 获取gamma值
+    #[wasm_bindgen(getter)]
+    pub fn gamma(&self) -> f64 {
+        self.gamma
+    }
+
+    // 设置gamma值
+    #[wasm_bindgen(setter)]
+    pub fn set_gamma(&mut self, gamma: f64) {
+        self.gamma = gamma;
+    }
+
+    // 获取alpha通道状态
+    #[wasm_bindgen(getter)]
+    pub fn alpha(&self) -> bool {
+        self.alpha
+    }
+
+    // 获取透明度颜色
+    #[wasm_bindgen]
+    pub fn get_trans_color(&self) -> Option<Uint8Array> {
+        self.trans_color.as_ref().map(|colors| {
+            let array = Uint8Array::new_with_length(colors.len() as u32);
+            for (i, &color) in colors.iter().enumerate() {
+                array.set_index(i as u32, color as u8);
+            }
+            array
+        })
+    }
 }
 
 // 将PNG数据转换为RGBA格式
@@ -387,15 +549,36 @@ fn convert_to_rgba(data: &[u8], info: &png::Info) -> Vec<u8> {
 // 导出函数用于从JavaScript调用（兼容原始pngjs API）
 #[wasm_bindgen]
 pub fn create_png() -> PNG {
-    PNG::new()
+    PNG::new(None)
 }
 
 // 兼容性函数 - 创建并解析PNG
 #[wasm_bindgen]
 pub fn create_png_from_data(data: &[u8]) -> Result<PNG, JsValue> {
-    let mut png = PNG::new();
+    let mut png = PNG::new(None);
     png.parse(data, None)?;
     Ok(png)
+}
+
+// 原始pngjs的同步API
+#[wasm_bindgen]
+pub struct PNGSync;
+
+#[wasm_bindgen]
+impl PNGSync {
+    // 同步读取PNG
+    #[wasm_bindgen]
+    pub fn read(buffer: &[u8], options: Option<JsValue>) -> Result<PNG, JsValue> {
+        let mut png = PNG::new(options);
+        png.parse(buffer, None)?;
+        Ok(png)
+    }
+    
+    // 同步写入PNG
+    #[wasm_bindgen]
+    pub fn write(png: &PNG, options: Option<JsValue>) -> Result<Vec<u8>, JsValue> {
+        png.pack()
+    }
 }
 
 // 当模块被加载时调用
